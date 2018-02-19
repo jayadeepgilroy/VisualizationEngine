@@ -1,10 +1,13 @@
 package com.example.demo;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -19,8 +22,6 @@ import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.tool.xml.ElementList;
 import com.itextpdf.tool.xml.XMLWorkerHelper;
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 
 @SpringBootApplication
 public class VisualizationEngineApplication {
@@ -33,13 +34,12 @@ public class VisualizationEngineApplication {
 @Service
 class HTMLToPDFService {
 
-	public ByteInputStream convertHTMLToPDF() throws DocumentException, IOException {
+	public ByteArrayInputStream convertHTMLToPDF() throws DocumentException, IOException {
 
-		String sampleHtml = "<!DOCTYPE html><html><body><h1>My First Heading</h1><p>My first paragraph.</p></body></html>";
-		ByteOutputStream out = new ByteOutputStream();
-		Document doc = new Document();
-		PdfWriter.getInstance(doc, out);
-		doc.open();
+		String sampleHtml = "<table style=\"width:100% ;color:red\"><tr><th>Firstname</th><th>Lastname</th><th>Age</th></tr><tr><td>Jill</td><td>Smith</td><td>50</td></tr><tr><td>Eve</td><td>Jackson</td><td>94</td></tr></table>";
+		Document document = new Document();
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		PdfWriter.getInstance(document, out);
 		PdfPTable table = new PdfPTable(1);
 		PdfPCell cell = new PdfPCell();
 		ElementList list = XMLWorkerHelper.parseToElementList(sampleHtml, null);
@@ -47,10 +47,12 @@ class HTMLToPDFService {
 			cell.addElement(element);
 		}
 		table.addCell(cell);
-		doc.add(table);
-		doc.close();
+		document.open();
+		document.add(table);
 
-		return new ByteInputStream(out.getBytes(), 100);
+		document.close();
+		return new ByteArrayInputStream(out.toByteArray());
+
 	}
 
 }
@@ -67,8 +69,11 @@ class VisualizationEngineController {
 	@GetMapping(value = "/report", produces = MediaType.APPLICATION_PDF_VALUE)
 	public ResponseEntity<InputStreamResource> generateReport() throws DocumentException, IOException {
 
-		ByteInputStream bis = htmlToPDFService.convertHTMLToPDF();
-		return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).body(new InputStreamResource(bis));
+		ByteArrayInputStream bis = htmlToPDFService.convertHTMLToPDF();
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Content-Disposition", "inline; filename=citiesreport.pdf");
+		return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).headers(headers)
+				.body(new InputStreamResource(bis));
 
 	}
 
